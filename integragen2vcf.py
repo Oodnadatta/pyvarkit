@@ -1,16 +1,34 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
-# author : Anne-Sophie Denommé-Pichon
+# author: Anne-Sophie Denommé-Pichon
 
 import csv
 import sys
+
+_homozygousThreshold = 5.
 
 def printHeader(sampleName):
 	print '##fileformat=VCFv4.2'
 	print '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s' % sampleName
 
-def printRow(row):
-        print '\t'.join((row[1], row[0], row[3], row[13], 'FIXME', '.', '.', '.', 'GT', 'FIXME'))
+def printRow(rowId, row):
+        homozigous = False
+        used = int(row[18])
+        alts = []
+        for nucleotideId, nucleotide in enumerate('ACGT'):
+                nucleotideCount = int(row[14 + nucleotideId])
+                if nucleotide != row[13] and nucleotideCount >= used / _homozygousThreshold:
+                        alts.append(nucleotide)
+                        if nucleotideCount >= used * (_homozygousThreshold - 1) / _homozygousThreshold:
+                                homozigous = True
+        phenotype = '0/1'
+        if len(alts) == 2:
+                phenotype = '1/2'
+        elif len(alts) >= 3:
+                print >> sys.stderr, 'Three or more alternatives at line %i (%s)' % (rowId, '\t'.join(row))
+        elif homozigous:
+                phenotype = '1/1'
+        print '\t'.join((row[1], row[0], row[3], row[13], ','.join(alts), '.', '.', '.', 'GT', phenotype))
 
 if __name__ == '__main__':
         lines = iter(sys.stdin) # Transforms stdin into an iterator on rows. Transforme l'entrée standard en itérateur sur lignes (comme avec un « for … in … »)
@@ -19,8 +37,8 @@ if __name__ == '__main__':
 
         secondRow = next(rows) # Gets the second row of the input file. Récupère la deuxième ligne du fichier d'entrée.
         printHeader(secondRow[2]) # Writes the header with the value of the third column of the second row as the sample name. Écrit le header, avec pour nom d'échantillon la valeur dans la troisième cellule de la deuxième ligne
-        printRow(secondRow) # Prints the second row of the output file. Affiche la deuxième ligne convertie du fichier de sortie
+        printRow(2, secondRow) # Prints the second row of the output file. Affiche la deuxième ligne convertie du fichier de sortie
 
         # Prints the following rows of the output file. Affiche les lignes suivantes converties du fichier de sortie
-        for row in rows:
-                printRow(row)
+        for rowId, row in enumerate(rows, 3):
+                printRow(rowId, row)
